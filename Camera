@@ -27,7 +27,7 @@ def main():
     start_time = None
 
     # Specify the directory to save the video files
-    save_dir = "/Users/ethanhuchler/VS Code Python/Videos"
+    save_dir = "../Videos"
     os.makedirs(save_dir, exist_ok=True)  # Create the directory if it doesn't exist
 
     # Initialize the last capture time
