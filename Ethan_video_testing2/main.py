@@ -1,4 +1,6 @@
 import cv2
+import os
+import csv
 import numpy as np
 from scipy.optimize import curve_fit
 from video_processing.intensity_analysis import calculate_mean_intensity
@@ -104,7 +106,7 @@ def process_video(video_path, crop_coordinates):
         intensity_data.append({'time': frame_count - 3, 'mean_intensity': mean_intensity})
         frame_count += 1
 
-        print(f"Processed frame {frame_count}, mean intensity: {mean_intensity}")
+        #print(f"Processed frame {frame_count}, mean intensity: {mean_intensity}")
 
     cap.release()
     cv2.destroyAllWindows()
@@ -178,7 +180,8 @@ def run_analysis():
     save_crop_coordinates(crop_coordinates)
 
     # List all video files in the directory
-    video_directory = "/Users/ethanhuchler/Desktop/Capstone/ChemTreat-Image-Analysis/Ethan_video_testing2/BestRun"
+    video_directory = "C:/Users/elika/Senior Design/Data/03_25-Videos" 
+    #"ChemTreat-Image-Analysis/Ethan_video_testing2/BestRun"
     video_files = [os.path.join(video_directory, f) for f in os.listdir(video_directory) if f.endswith(".mp4")]
 
     # Open CSV file for writing
@@ -243,7 +246,8 @@ if __name__ == "__main__":
         h_entry.insert(0, previous_coordinates[3])
 
     # Define the video directory for cropping
-    video_directory = "/Users/ethanhuchler/Desktop/Capstone/ChemTreat-Image-Analysis/Ethan_video_testing2/BestRun"
+    video_directory = "C:/Users/elika/Senior Design/Data/03_25-Videos" 
+    #"/Users/ethanhuchler/Desktop/Capstone/ChemTreat-Image-Analysis/Ethan_video_testing2/BestRun"
 
     tk.Button(root, text="Select Crop Area", command=lambda: open_crop_window(video_directory)).grid(row=4, column=0, columnspan=2)
     tk.Button(root, text="Run", command=run_analysis).grid(row=5, column=0, columnspan=2)

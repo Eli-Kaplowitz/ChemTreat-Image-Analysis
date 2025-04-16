@@ -6,6 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 import tensorflow as tf
+from tensorflow.keras import layers
 
 
 #take the directory of videos and splits them into training, validation, and test sets
@@ -78,6 +79,11 @@ def format_frames(frame, output_size, crop_coordinates=None):
   frame = tf.image.convert_image_dtype(frame, tf.float32)
   frame_height, frame_width, _ = frame.shape
 
+  # If the frame is 1920x1080, change to 1280x720
+  if frame_height == 1080 and frame_width == 1920:
+    frame = tf.image.resize(frame, (720, 1280))
+    frame_height, frame_width, _ = frame.shape
+
   if crop_coordinates:
     offset_height, offset_width = crop_coordinates
     target_height, target_width = output_size
@@ -95,7 +101,7 @@ def format_frames(frame, output_size, crop_coordinates=None):
   return frame
 
 
-def frames_from_video_file(video_path, n_frames, output_size = (720,720), frame_step = 3, crop_coordinates = (360, 520)):
+def frames_from_video_file(video_path, n_frames, output_size = (484,484), frame_step = 3, crop_coordinates = (190, 315)):
   """
     Creates frames from each video file present for each category.
 
@@ -114,10 +120,10 @@ def frames_from_video_file(video_path, n_frames, output_size = (720,720), frame_
         print(f"Error: Could not open video file {video_path}")
         return None
 
-  video_length = src.get(cv2.CAP_PROP_FRAME_COUNT)
+  #video_length = src.get(cv2.CAP_PROP_FRAME_COUNT)
   #print(f"Video length of {video_path}: {video_length} frames")
 
-  need_length = 1 + (n_frames - 1) * frame_step
+  #need_length = 1 + (n_frames - 1) * frame_step
   #print(f"Need length: {need_length} frames")
 
   #if need_length > video_length:
@@ -154,11 +160,12 @@ def frames_from_video_file(video_path, n_frames, output_size = (720,720), frame_
 
 
 class FrameGenerator:
-  def __init__(self, path, regression_splits, n_frames, training = False):
+  def __init__(self, path, regression_splits=None, n_frames=20, training = False):
     """ Returns a set of frames with their associated label. 
 
       Args:
-        path: Video file paths.
+        path: List of video file paths.
+        regression_splits: Regression values for each video file.
         n_frames: Number of frames. 
         training: Boolean to determine if training dataset is being created.
     """
@@ -169,7 +176,20 @@ class FrameGenerator:
     #self.class_names = sorted(set(p.name for p in self.path.iterdir() if p.is_dir()))
     #self.class_ids_for_name = dict((name, idx) for idx, name in enumerate(self.class_names))
 
-  def __call__(self):
+  def singleton(self):
+    """Returns a set of frames for one video file."""
+    video_frames = frames_from_video_file(self.path[0], self.n_frames)
+    if video_frames is None:
+      raise ValueError("Failed to extract frames from the video file.")
+    
+    video_frames = tf.convert_to_tensor(video_frames, dtype=tf.float32)
+
+    regression_value = tf.convert_to_tensor(0, dtype=tf.int16)
+
+    yield video_frames, regression_value
+  
+  def pairs(self):
+    """Returns a set of frames with their associated label."""
     pairs = list(zip(self.path, self.regression))
 
     if self.training:
@@ -185,6 +205,19 @@ class FrameGenerator:
         yield video_frames, regression_value
       else:
         print(f"Failed to extract frames from {path}")
+
+  def __call__(self):
+    if isinstance(self.path, (list, tuple)):
+      if len(self.path) == 1:
+        return self.singleton()
+      else:
+        return self.pairs()
+    elif isinstance(self.path, (str, pathlib.Path)):
+      self.path = [self.path]
+      return self.singleton()
+    else:
+      raise TypeError(f"Unsupported type for self.path: {type(self.path)}")
+    
 
 
 class PrintLayer(layers.Layer):

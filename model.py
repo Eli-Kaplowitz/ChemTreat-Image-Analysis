@@ -16,17 +16,20 @@ regression_data1 =  [273.25, 173.52, 203.31, 227.25, 277.69, 213.21, 299.44, 360
 regression_data2 = [84.79, 71.87, 74.87, 77.27, 72.32, 76.91, 77.37, 85.43, 83.32, 83.50]
 regression_data3 = [273.25, 84.79, 173.52, 71.87, 203.31, 74.87, 227.25, 77.27, 277.69, 72.32, 213.21, 76.91, 299.44, 77.37, 360.26, 85.43, 319.59, 83.32, 372.49, 83.50]
 regression_data4 = [234.3158992, 238.3762008, 223.3395508 ,258.2964891, 308.3809155, 237.833691, 269.6809362, 240.1028949, 238.0344646, 289.8085463, 296.7480347, 254.8408521, 280.8549995, 305.4960162, 304.5373716, 332.1339075, 91.83076272, 102.9290284, 107.2722505, 118.4947244, 125.5493955, 143.4469968, 167.6710487, 168.928053, 161.7154215, 187.2395374, 208.7778182, 168.3711367, 209.7009893, 189.5577842, 209.69769, 198.7802618, 205.9488195, 209.9530789, 219.0467102, 221.408286, 221.3151488, 225.2788691, 230.7125019, 239.5862706, 236.1916802, 225.7250247, 240.7507197, 43.47757415, 40.49157473, 33.28122335, 32.0989265, 32.18500263, 22.77658, 22.39606886, 20.41376027, 22.6924993, 21.53471254, 23.88203075, 23.93024395, 21.85024589, 23.41806801, 28.39045941, 25.1815792, 26.33353658, 25.69546504, 24.17679749, 23.21302003]
+regression_data25 = [296.3947639863612, 59.29759116577222, 271.1137036859074, 35.00814904403077, 277.3375119246293, 62.975402043388144, 289.8261088824782, 64.79454709, 292.9268792437999, 67.96623781845882, 306.6297419086934, 79.10460210498405, 298.59346218722703, 81.83847265, 310.0444128, 37.15570045218213, 279.87226272154675, 42.78107581226777, 281.99402868546935, 50.56634461772411, 272.139951, 67.51738465028785, 283.48626602588627, 53.953535177348165, 299.70191820923134, 60.076302673909204, 279.1338214667887, 57.204503865849986, 296.66436600677025, 58.66191148391129]
+regression_data5 = regression_data4 + regression_data25
 data1 = "C:/Users/elika/Senior Design/Data/FeCl3-Videos-2_21_25/"
 data2 = "C:/Users/elika/Senior Design/Data/Polymer-Videos-2_21_25"
 data3 = "C:/Users/elika/Senior Design/Data/Combined-Videos-2_21_25"
 data4 = "C:/Users/elika/Senior Design/Data/3_07-3_21-Videos"
-save_path = "C:/Users/elika/Senior Design/Results/3_07-3_21-Videos_model/"
+data5 = "C:/Users/elika/Senior Design/Data/3_07-3_21-3_25-Videos"
+save_path = "C:/Users/elika/Senior Design/Results/3_07-3_21-3_25-Videos_model2/"
 
 HEIGHT = 224
 WIDTH = 224
 
-data = data4  # Choose the appropriate data directory for your use case
-regression_data = regression_data4  # Choose the appropriate regression data for your use case
+data = data5  # Choose the appropriate data directory for your use case
+regression_data = regression_data5  # Choose the appropriate regression data for your use case
 
 #print files in data
 print(f"Files in {data}:")
@@ -101,7 +104,7 @@ model.add(layers.Dense(1, activation='softplus'))
 frames, label = next(iter(train_ds))
 model.build(frames)
 
-train_ds = train_ds.repeat()  # Repeat the dataset for training
+train_ds = train_ds.repeat()  # Repeat the dataset for training   
 steps_per_epoch = len(subset_paths['train']) // batch_size
 
 val_ds = val_ds.repeat()  # Repeat the validation dataset
@@ -124,8 +127,13 @@ history = model.fit(
     validation_steps=val_steps,
     callbacks=[early_stopping])
 
+#check if save_path exists and create it if it doesn't
+if not os.path.exists(save_path):
+    os.makedirs(save_path)
+    os.makedirs(save_path + 'model')
+
 # Save the model
-model.save(save_path + 'model/video_model.h5')
+model.save(save_path + 'model/video_model.keras')
 
 # Save log file
 log_file = save_path + 'training_log.txt'
@@ -137,22 +145,39 @@ with open(log_file, 'w') as f:
     f.write(f"Number of frames: {n_frames}\n")
     f.write(f"Input shape: {(n_frames, HEIGHT, WIDTH, 3)}\n")
 
+"""
 # Save the model architecture
 model_json = model.to_json()
 with open(save_path + 'model/model_architecture.json', 'w') as json_file:
     json_file.write(model_json)
 # Save the model weights
-model.save_weights(save_path + 'model/model_weights.h5') 
+model.save_weights(save_path + 'model/model_weights.keras') 
+"""
+
+# Save model splits to csv
+
+max_length = max(len(subset_paths['train']),
+                 len(regression_splits['train']),
+                 len(subset_paths['val']),
+                 len(regression_splits['val']),
+                 len(subset_paths['test']),
+                 len(regression_splits['test']))
+
+with open(save_path + 'model/model_splits.csv', 'w') as f:
+    f.write("train_paths,train,val_paths,val,test_paths,test\n")
+
+    for i in range(max_length):
+        train_path = subset_paths['train'][i] if i < len(subset_paths['train']) else ""
+        train_split = regression_splits['train'][i] if i < len(regression_splits['train']) else ""
+        val_path = subset_paths['val'][i] if i < len(subset_paths['val']) else ""
+        val_split = regression_splits['val'][i] if i < len(regression_splits['val']) else ""
+        test_path = subset_paths['test'][i] if i < len(subset_paths['test']) else ""
+        test_split = regression_splits['test'][i] if i < len(regression_splits['test']) else ""
+
+        f.write(f"{train_path},{train_split},{val_path},{val_split},{test_path},{test_split}\n")
 
 #save test_ds
 test_ds = test_ds.unbatch()
 test_ds = test_ds.map(lambda x, y: y)
 test_ds = np.array(list(test_ds.map(lambda x: x.numpy())))
 np.save(save_path + 'model/test_ds.npy', test_ds)
-
-# Save model splits to csv
-with open(save_path + 'model/model_splits.csv', 'w') as f:
-    f.write("train_paths,train,val_paths,val,test_paths,test\n")
-    for i in range(len(subset_paths['train'])):
-        f.write(f"{subset_paths['train'][i]},{regression_splits['train'][i]},{subset_paths['val'][i]},{regression_splits['val'][i]},{subset_paths['test'][i]},{regression_splits['test'][i]}\n")
-

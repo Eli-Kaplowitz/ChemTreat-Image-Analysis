@@ -1,22 +1,49 @@
 import numpy as np
+import pandas as pd
+import pathlib
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 import tensorflow as tf
 from tensorflow.keras import models
+from utils.utils import FrameGenerator
 
 
-model_path = "C:/Users/elika/Senior Design/Results/3_07-3_21-Videos_model/"
-model = models.load_model(model_path + "model/model.h5")
-model_splits = np.load(model_path + 'model/model_splits.npy', allow_pickle=True).item()
+model_path = "C:/Users/elika/Senior Design/Results/3_07-3_21-3_25-Videos_model2/"
+model = models.load_model(model_path + "model/video_model.keras")
+model_splits = pd.read_csv(model_path + 'model/model_splits.csv')
+model_splits = model_splits.drop(model_splits.columns[:4], axis=1)
+model_splits = model_splits.dropna(axis=0, how='all')
+video_paths = model_splits['test_paths'].tolist()
+#video_paths = [p for p in video_paths if isinstance(p, str) and p.strip()]
+regression_data = model_splits['test'].tolist()
+#regression_data = [r for r in regression_data if isinstance(r, (int, float))]  # Filter out non-numeric values
 
+#print(f"Video paths: {video_paths}")
+#print(f"Regression data: {regression_data}")
 
+n_frames = 20
+batch_size = 8
+output_signature = (tf.TensorSpec(shape = (None, None, None, 3), dtype = tf.float32),
+                    tf.TensorSpec(shape = (), dtype = tf.int16))
+#load test set video data
+
+#convert video paths to pathlib objects
+video_paths = [pathlib.Path(p) for p in video_paths]
+
+test_ds = tf.data.Dataset.from_generator(FrameGenerator(video_paths, regression_data, n_frames), 
+                                          output_signature = output_signature)
+
+test_ds = test_ds.batch(batch_size)
+
+"""
 test_labels = np.load(model_path + 'model/test_ds.npy')
 test_ds = tf.data.Dataset.from_tensor_slices(test_labels)
 test_ds = test_ds.batch(8)  # Adjust batch size as needed
 video_path = "C:/Users/elika/Senior Design/Data/3_07-3_21-Videos"
 video_files = [f for f in os.listdir(video_path) if f.endswith('.mp4')]
 video_files.sort()  # Sort the video files for consistent ordering
+"""
 
 predictions = model.predict(test_ds)
 
@@ -27,12 +54,12 @@ predictions = np.array(predictions)
 def rmse(predictions, targets):
     return np.sqrt(np.mean(((predictions - targets) ** 2)))
 
-print(f"RMSE: {rmse(predictions, test_labels)}")
+print(f"RMSE: {rmse(predictions, regression_data)}")
 
 #calculate the average margin of error
 moe = 0
 for i in range(len(predictions)):
-    moe += abs(predictions[i] - test_labels[i])/test_labels[i]
+    moe += abs(predictions[i] - regression_data[i])/regression_data[i]
 moe = moe/len(predictions)
 print(moe)
 
@@ -41,7 +68,7 @@ print(moe)
 sns.set_theme("poster")
 plt.plot([0, 400], [0, 400], color='red', linewidth=3)
 #plt.rcParams.update({'lines.markersize': 10})
-plt.scatter(regression_splits['test'], predictions.flatten(), linewidths=1, edgecolors='black', zorder=2)
+plt.scatter(regression_data, predictions.flatten(), linewidths=1, edgecolors='black', zorder=2)
 plt.xlabel('True Values (sec)')
 plt.ylabel('Predictions (sec)')
 plt.axis('equal')
@@ -52,12 +79,26 @@ plt.title('Parity Plot')
 
 # Ensure predictions is flattened and matches the length of regression_splits['test']
 predictions_flattened = predictions.flatten()
-if len(regression_splits['test']) != len(predictions_flattened):
-	raise ValueError(f"Mismatch in lengths: regression_splits['test'] has length {len(regression_splits['test'])}, "
+if len(regression_data) != len(predictions_flattened):
+	raise ValueError(f"Mismatch in lengths: regression_data has length {len(regression_data)}, "
 					 f"but predictions has length {len(predictions_flattened)}")
 
 # Calculate and show r^2
-r2 = np.corrcoef(regression_splits['test'], predictions_flattened)[0, 1]
+r2 = np.corrcoef(regression_data, predictions_flattened)[0, 1]
 plt.text(180, 50, f"R^2: {r2:.2f}", fontsize=24)
 
-plt.show()
+plt.savefig(model_path + 'model/parity_plot.png', dpi=300)
+
+#save predictions to csv along with video paths
+predictions = predictions.flatten()
+predictions_df = pd.DataFrame(predictions, columns=['Predictions']) 
+predictions_df['True Values'] = regression_data
+predictions_df['Video Path'] = video_paths
+#include rmse, moe, and r2 in the csv while filling the rest with NaN
+predictions_df['RMSE'] = rmse(predictions, regression_data)
+predictions_df['MOE'] = [moe] * len(predictions_df)
+predictions_df['R2'] = [r2] * len(predictions_df)
+
+predictions_df.to_csv(model_path + 'model/predictions.csv', index=False)
+
+
