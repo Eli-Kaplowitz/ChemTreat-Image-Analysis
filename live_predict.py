@@ -28,6 +28,26 @@ Stop the camera and compare the prediction to the actual data.
 Save the prediction to a file.
 """
 
+def start_camera_thread(save_dir, quick_cut, find_time, csv_path):
+    """
+    Starts the camera recording in a separate thread and returns the video filename after quick_cut.
+    """
+    video_filename = None
+
+    def camera_thread():
+        nonlocal video_filename
+        video_filename = run_camera(save_dir, quick_cut, find_time, csv_path)
+
+    # Start the camera thread
+    thread = threading.Thread(target=camera_thread)
+    thread.start()
+
+    # Wait for the thread to return the video filename after quick_cut
+    while video_filename is None:
+        pass  # Wait until the video filename is returned
+
+    return video_filename, thread
+
 model_path = "C:/Users/elika/Senior Design/Results/3_07-3_21-3_25-Videos_model2/"
 model = models.load_model(model_path + "model/video_model.keras")
 
@@ -36,7 +56,7 @@ save_dir = "C:/Users/elika/Senior Design/Results/live_predict/1"
 video_path = os.path.join(save_dir, "live_video.mp4")
 csv_path = os.path.join(save_dir, "settling_times.csv")
 
-video_filename = run_camera(save_dir, 70, False, csv_path)
+video_filename, camera_thread = start_camera_thread(save_dir, 70, True, csv_path)
 
 print(f"Video saved to: {video_filename}")
 
@@ -63,3 +83,6 @@ print("test_ds batched")
 prediction = model.predict(test_ds)
 
 print(f"Prediction: {prediction}")
+
+camera_thread.join()  # Wait for the camera thread to finish
+print("Camera thread finished")

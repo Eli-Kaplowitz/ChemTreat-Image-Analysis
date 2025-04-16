@@ -102,6 +102,15 @@ def run_camera(save_dir = "../Videos", quick_cut=None, find_time=False, csv_path
                 if not quick_cut_filename_returned:
                     quick_cut_filename_returned = True
                     print(f"Returning video filename after quick cut: {video_filename}")
+            
+            # Check for manual settling time input
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('m'):  # Press 'm' to manually set the settling time
+                manual_settling_time = elapsed_time
+                print(f"Manual settling time set at {manual_settling_time:.2f} seconds.")
+                if csv_path is not None:
+                    with open(csv_path, 'a') as f:
+                        f.write(f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')},Manual,{manual_settling_time:.2f}\n")
 
         # Release resources when done
         cap.release()
