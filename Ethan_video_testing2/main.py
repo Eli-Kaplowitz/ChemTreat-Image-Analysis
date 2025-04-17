@@ -3,8 +3,8 @@ import os
 import csv
 import numpy as np
 from scipy.optimize import curve_fit
-from video_processing.intensity_analysis import calculate_mean_intensity
-from utils.graph_generator import plot_fitted_curve
+from Ethan_video_testing2.video_processing.intensity_analysis import calculate_mean_intensity
+from Ethan_video_testing2.utils.graph_generator import plot_fitted_curve
 import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import simpledialog
