@@ -9,7 +9,7 @@ from tensorflow.keras import models
 from utils.utils import FrameGenerator
 
 
-model_path = "C:/Users/elika/Senior Design/Results/3_07-3_21-3_25-Videos_model2/"
+model_path = "C:/Users/elika/Senior Design/Results/Clay_FeCl_Combined_model/"
 model = models.load_model(model_path + "model/video_model.keras")
 model_splits = pd.read_csv(model_path + 'model/model_splits.csv')
 model_splits = model_splits.drop(model_splits.columns[:4], axis=1)
@@ -46,6 +46,7 @@ video_files.sort()  # Sort the video files for consistent ordering
 """
 
 predictions = model.predict(test_ds)
+test_loss, test_mae = model.evaluate(test_ds, verbose=2)
 
 # Convert predictions to numpy array
 predictions = np.array(predictions)
@@ -61,21 +62,28 @@ moe = 0
 for i in range(len(predictions)):
     moe += abs(predictions[i] - regression_data[i])/regression_data[i]
 moe = moe/len(predictions)
-print(moe)
+print(f"Average % error: {moe}")
+
+#print mae
+print(f"MAE: {test_mae}")
 
 #parity plot
 #plot x=y line
+#plt.figure(figsize=(10, 10))
 sns.set_theme("poster")
 plt.plot([0, 400], [0, 400], color='red', linewidth=3)
 #plt.rcParams.update({'lines.markersize': 10})
 plt.scatter(regression_data, predictions.flatten(), linewidths=1, edgecolors='black', zorder=2)
-plt.xlabel('True Values (sec)')
-plt.ylabel('Predictions (sec)')
-plt.axis('equal')
+plt.xlabel('True Values')
+plt.ylabel('Predictions')
+#plt.axis('equal')
 plt.axis('square')
 plt.xlim([0, plt.xlim()[1]])
 plt.ylim([0, plt.ylim()[1]])
 plt.title('Parity Plot')
+#plt.xlim([25, 70])
+#plt.ylim([25, 70])
+plt.subplots_adjust(bottom=0.2)
 
 # Ensure predictions is flattened and matches the length of regression_splits['test']
 predictions_flattened = predictions.flatten()
@@ -94,8 +102,9 @@ predictions = predictions.flatten()
 predictions_df = pd.DataFrame(predictions, columns=['Predictions']) 
 predictions_df['True Values'] = regression_data
 predictions_df['Video Path'] = video_paths
-#include rmse, moe, and r2 in the csv while filling the rest with NaN
+#include rmse, moe, mae, and r2 in the csv while filling the rest with NaN
 predictions_df['RMSE'] = rmse(predictions, regression_data)
+predictions_df['MAE'] = test_mae
 predictions_df['MOE'] = [moe] * len(predictions_df)
 predictions_df['R2'] = [r2] * len(predictions_df)
 

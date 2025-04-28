@@ -43,10 +43,10 @@ def start_camera_thread(save_dir, quick_cut, find_time, csv_path, shared_data):
 
     return thread
 
-model_path = "C:/Users/elika/Senior Design/Results/3_07-3_21-3_25-Videos_model2/"
+model_path = "C:/Users/elika/Senior Design/Results/Clay_FeCl_Combined_model/"
 model = models.load_model(model_path + "model/video_model.keras")
 
-save_dir = "C:/Users/elika/Senior Design/Results/live_predict/1"
+save_dir = "C:/Users/elika/Senior Design/Results/live_predict/2/"
 
 video_path = os.path.join(save_dir, "live_video.mp4")
 csv_path = os.path.join(save_dir, "settling_times.csv")
@@ -54,51 +54,64 @@ csv_path = os.path.join(save_dir, "settling_times.csv")
 shared_data = {
     "video_filename": None,
     "elapsed_time": None,
+    "prediction": None,
     "video_ready_event": threading.Event(),
     "thread_finished_event": threading.Event(),
+    "video_stopped": threading.Event(),
+    "video_restarted": threading.Event()
 }
 
 camera_thread = start_camera_thread(save_dir, 70, True, csv_path, shared_data)
 
 
+while True:
+    # Wait for the video file to be ready
+    shared_data["video_ready_event"].wait()  # Block until the video file is ready
+    time.sleep(0.1)  # Give some time for the video file to be created
+    video_filename = shared_data["video_filename"]
+    print(f"Video saved to: {video_filename}")
 
-# Wait for the video file to be ready
-shared_data["video_ready_event"].wait()  # Block until the video file is ready
-time.sleep(0.1)  # Give some time for the video file to be created
-video_filename = shared_data["video_filename"]
-print(f"Video saved to: {video_filename}")
+    n_frames = 20
+    batch_size = 1
 
-n_frames = 20
-batch_size = 1
-
-output_signature = (tf.TensorSpec(shape = (None, None, None, 3), dtype = tf.float32), 
-                    tf.TensorSpec(shape = (), dtype = tf.int16))
+    output_signature = (tf.TensorSpec(shape = (None, None, None, 3), dtype = tf.float32), 
+                        tf.TensorSpec(shape = (), dtype = tf.int16))
 
 
-video_filename = pathlib.Path(video_filename)
+    video_filename = pathlib.Path(video_filename)
 
-print("Video filename as pathlib")
+    print("Video filename as pathlib")
 
-test_ds = tf.data.Dataset.from_generator(FrameGenerator(video_filename, n_frames), 
-                                          output_signature = output_signature)
+    test_ds = tf.data.Dataset.from_generator(FrameGenerator(video_filename, n_frames), 
+                                            output_signature = output_signature)
 
-print("test_ds created")
+    print("test_ds created")
 
-test_ds = test_ds.batch(batch_size)
+    test_ds = test_ds.batch(batch_size)
 
-print("test_ds batched")
+    print("test_ds batched")
 
-prediction = model.predict(test_ds)
+    prediction = model.predict(test_ds)
 
-print(f"Prediction: {prediction}")
+    shared_data["prediction"] = prediction
 
-shared_data["thread_finished_event"].wait()  # Block until the thread is finished
+    print(f"Prediction: {prediction}")
+
+    shared_data["video_stopped"].wait()  # Wait for the video to be restarted
+
+    while not shared_data["video_restarted"].is_set():
+        if shared_data["thread_finished_event"].is_set():  # Block until the thread is finished
+            break
+        time.sleep(0.1)  # Sleep for a short time to avoid busy waiting
+################################
+
+
 print('Thread Finished')
 elapsed_time = shared_data["elapsed_time"]
 print(f"Elapsed time: {elapsed_time}")
 
-camera_thread.join()  # Wait for the camera thread to finish
-print("Camera thread finished")
-
 print(f"Predicted time: {prediction}")
 print(f"Actual time: {elapsed_time}")
+
+camera_thread.join()  # Wait for the camera thread to finish
+print("Camera thread finished")

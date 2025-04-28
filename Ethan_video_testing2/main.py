@@ -180,7 +180,7 @@ def run_analysis():
     save_crop_coordinates(crop_coordinates)
 
     # List all video files in the directory
-    video_directory = "C:/Users/elika/Senior Design/Data/03_25-Videos" 
+    video_directory = "C:/Users/elika/Senior Design/Data/Clay" 
     #"ChemTreat-Image-Analysis/Ethan_video_testing2/BestRun"
     video_files = [os.path.join(video_directory, f) for f in os.listdir(video_directory) if f.endswith(".mp4")]
 
@@ -246,7 +246,7 @@ if __name__ == "__main__":
         h_entry.insert(0, previous_coordinates[3])
 
     # Define the video directory for cropping
-    video_directory = "C:/Users/elika/Senior Design/Data/03_25-Videos" 
+    video_directory = "C:/Users/elika/Senior Design/Data/Clay" 
     #"/Users/ethanhuchler/Desktop/Capstone/ChemTreat-Image-Analysis/Ethan_video_testing2/BestRun"
 
     tk.Button(root, text="Select Crop Area", command=lambda: open_crop_window(video_directory)).grid(row=4, column=0, columnspan=2)

@@ -31,8 +31,10 @@ def run_camera(save_dir = "../Videos", quick_cut=None, find_time=False, csv_path
     start_time = None
     elapsed_time = 0
     quick_cut_saved = False
+    settle_time = None  # Initialize settle_time
     intensity_data = []  # Store intensity data for real-time analysis
     quick_cut_filename_returned = False  # Flag to track if quick_cut filename has been returned
+    all_done = False  # Flag to track if all processing is done
 
     # Specify the directory to save the video files
     os.makedirs(save_dir, exist_ok=True)  # Create the directory if it doesn't exist
@@ -41,7 +43,7 @@ def run_camera(save_dir = "../Videos", quick_cut=None, find_time=False, csv_path
     last_capture_time = time.time()
 
     def process_frames():
-        nonlocal recording, elapsed_time, quick_cut_saved, quick_cut_filename_returned, out, cap, last_capture_time, start_time
+        nonlocal recording, elapsed_time, quick_cut_saved, quick_cut_filename_returned, out, cap, last_capture_time, start_time, settle_time, all_done
         crop_coordinates = load_crop_coordinates()
         x, y, w, h = crop_coordinates
 
@@ -58,19 +60,33 @@ def run_camera(save_dir = "../Videos", quick_cut=None, find_time=False, csv_path
             cv2.imshow('Camera Feed', frame)
 
             # Create a blank image for the timer and status
-            status_img = 255 * np.ones((200, 400, 3), dtype=np.uint8)
+            status_img = 255 * np.ones((400, 400, 3), dtype=np.uint8)
 
             # Update the timer and status
             if recording:
-                elapsed_time = time.time() - start_time
-                status_text = f"Recording... {elapsed_time:.2f} sec"
+                if not all_done:
+                    elapsed_time = time.time() - start_time
+                status_text = [f"Recording... {elapsed_time:.2f} sec"]
                 color = (0, 0, 255)  # Red color for recording
+                # Include text for prediction and settle_time on separate lines
+                if shared_data and 'prediction' in shared_data:
+                    prediction = shared_data['prediction']
+                    status_text.append(f"Prediction: {prediction}")
+                else:
+                    status_text.append("Prediction: N/A")
+                if settle_time is not None:
+                    status_text.append(f"Settle Time: {settle_time:.2f} sec")
+                else:
+                    status_text.append("Settle Time: N/A")
             else:
-                status_text = "Not Recording"
+                status_text = ["Not Recording"]
                 color = (0, 255, 0)  # Green color for not recording
 
             # Put the text on the status image
-            cv2.putText(status_img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+            y_offset = 50  # Initial vertical position
+            for line in status_text:
+                cv2.putText(status_img, line, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+                y_offset += 50
 
             # Display the status image
             cv2.imshow('Status', status_img)
@@ -82,11 +98,25 @@ def run_camera(save_dir = "../Videos", quick_cut=None, find_time=False, csv_path
                 # Start recording
                 recording = True
                 start_time = time.time()
+                # reset all flags
+                quick_cut_saved = False
+                quick_cut_filename_returned = False
+                all_done = False
+                # Reset the all variables
+                elapsed_time = 0
+                settle_time = None
+                intensity_data = []
+                shared_data["prediction"] = None
+                shared_data["video_stopped"].clear()
+                shared_data["video_ready_event"].clear()
+                # Reset the last capture time
+                last_capture_time = time.time()
                 # Define the codec and create VideoWriter object
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 video_filename = os.path.join(save_dir, f'recording_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.mp4')
                 out = cv2.VideoWriter(video_filename, fourcc, capture_frame_rate, (width, height))
                 print(f"Recording started: {video_filename}")
+                shared_data["video_restarted"].set()  # Signal that the video has restarted
 
             elif key == ord('s') and recording:
                 # Stop recording
@@ -94,8 +124,16 @@ def run_camera(save_dir = "../Videos", quick_cut=None, find_time=False, csv_path
                 out.release()
                 out = None
                 print("Recording stopped")
+                shared_data["video_restarted"].clear()  # Clear the video restarted flag
+                shared_data["video_stopped"].set()
 
-            if recording:
+            elif key == ord('q') and not recording:
+                # Quit the program
+                shared_data["thread_finished_event"].set()  # Signal that the thread has finished
+                print("Quitting...")
+                break
+
+            if recording and not all_done:
                 # Capture frames at the specified interval
                 current_time = time.time()
                 if current_time - last_capture_time >= 1.0 / capture_frame_rate:
@@ -132,7 +170,7 @@ def run_camera(save_dir = "../Videos", quick_cut=None, find_time=False, csv_path
                                         with open(csv_path, 'a') as f:
                                             f.write(f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')},{settle_time:.2f}\n")
                                     print(f"Breaking at {elapsed_time} with settle time of {settle_time}")
-                                    break
+                                    all_done = True
                         except RuntimeError as e:
                             print(f"Error fitting logistic growth model: {e}")
 
